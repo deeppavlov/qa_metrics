@@ -77,6 +77,7 @@ def main():
         doc_indices = ranker(questions)
         docs = [vocab([indices]) for indices in doc_indices]
         del ranker
+        del vocab
 
         for n in range(args.top_n[0], args.top_n[1] + 1):
 
@@ -92,13 +93,13 @@ def main():
             mult_questions = str_multiplier(questions, chunks)
             pred_answers, pred_scores = logit_ranker(chunks, mult_questions)
 
-            # Counting reader metrics
+            # Counting ODQA metrics
 
             format_true_answers = [[a] for a in true_answers]
             f1 = squad_v1_f1(format_true_answers, pred_answers)
             em = squad_v1_exact_match(format_true_answers, pred_answers)
-            logger.info(f"Reader f1 v1 {f1:.3f}")
-            logger.info(f"Reader em v1 {em:.3f}")
+            logger.info(f"ODQA f1 v1 {f1:.3f}")
+            logger.info(f"ODQA em v1 {em:.3f}")
 
         t = time.time() - start_time
         logger.info(f"Completed successfully in {t:.3f} seconds.")
