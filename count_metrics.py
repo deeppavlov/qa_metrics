@@ -72,7 +72,7 @@ def parse_ru_squad(dataset_path):
     if isinstance(true_answers[0], str):
         true_answers = [[a] for a in true_answers]
 
-    return questions[:10], true_answers[:10]
+    return questions, true_answers
 
 
 def main():
