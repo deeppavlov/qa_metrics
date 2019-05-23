@@ -18,7 +18,7 @@ from logit_ranker import LogitRanker
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 fmt = logging.Formatter('%(asctime)s: [ %(message)s ]', '%m/%d/%Y %I:%M:%S %p')
-file = logging.FileHandler('count_metrics.log')
+file = logging.FileHandler('metrics.log')
 file.setFormatter(fmt)
 logger.addHandler(file)
 
