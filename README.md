@@ -24,4 +24,5 @@ python count_metrics.py dataset.csv sddata_pull -n 1 5 -ak 'Answer Toloker 1'
 ```
 
 The evaluation result is written to `metrics.log`
-The model answers are writtenb into `answer_top_n.csv` files, where `n` is the number of documents retrieved.
+
+The model answers are written into `answer_top_n.csv` files, where `n` is the number of documents retrieved.
