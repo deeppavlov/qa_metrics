@@ -8,20 +8,23 @@ import pandas as pd
 from deeppavlov import configs
 from deeppavlov.core.commands.infer import build_model
 from deeppavlov.vocabs.wiki_sqlite import WikiSQLiteVocab
-from deeppavlov.models.doc_retrieval.logit_ranker import LogitRanker
 from deeppavlov.models.preprocessors.odqa_preprocessors import DocumentChunker, StringMultiplier
 from deeppavlov.metrics.squad_metrics import squad_v1_f1, squad_v1_exact_match
+from deeppavlov.core.common.file import read_json
+
+from logit_ranker import LogitRanker
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 fmt = logging.Formatter('%(asctime)s: [ %(message)s ]', '%m/%d/%Y %I:%M:%S %p')
-file = logging.FileHandler('metrics.log')
+file = logging.FileHandler('metrics_squad_test.log')
 file.setFormatter(fmt)
 logger.addHandler(file)
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument("dataset_path", help="path to a dataset", type=str)
+parser.add_argument("dataset_name", help="the codename of a dataset", type=str, choices=['sddata_pull', 'ru_squad'])
 parser.add_argument("-n", "--top-n", nargs='+', help="top n range contexts to retrieve", type=int, default=[1, 1])
 parser.add_argument("-ak", "--answer-key", help="a key to answers", type=str, default="Answer Dima")
 
@@ -34,7 +37,7 @@ def ranker_em_recall(docs, answers):
     score = 0
     for d, a in zip(docs, answers):
         for text in d:
-            if text.find(a) != -1:
+            if any(i in text for i in a):
                 score += 1
                 break
     return score / len(answers) * 100
@@ -47,16 +50,43 @@ def parse_sddata_pull(dataset_path, answer_key):
     logger.info(f"Final dataset size after cleaning {data.shape[0]}")
     questions = data.iloc[:, 0].values.tolist()
     true_answers = data[answer_key].values.tolist()
+    if isinstance(true_answers[0], str):
+        true_answers = [[a] for a in true_answers]
     return questions, true_answers
 
 
-def main():
+def parse_ru_squad(dataset_path):
+    dataset = read_json(dataset_path)
+    dataset = dataset['data'][0]['paragraphs']
+    true_answers = []
+    questions = []
+    for instance in dataset:
+        qas = instance['qas']
+        for j in range(len(qas)):
+            answers = qas[j]['answers']
+            question = qas[j]['question']
+            for k in range(len(answers)):
+                true_answers.append(answers[k]['text'])
+                questions.append(question)
 
+    if isinstance(true_answers[0], str):
+        true_answers = [[a] for a in true_answers]
+
+    return questions[:10], true_answers[:10]
+
+
+def main():
     # Read data
 
     args = parser.parse_args()
     dataset = args.dataset_path
-    questions, true_answers = parse_sddata_pull(dataset, args.answer_key)
+    dataset_name = args.dataset_name
+    if dataset_name == 'sddata_pull':
+        questions, true_answers = parse_sddata_pull(dataset, args.answer_key)
+    elif dataset_name == 'ru_squad':
+        questions, true_answers = parse_ru_squad(dataset)
+    else:
+        raise RuntimeError(f'Unknown dataset type! Select from {args.dataset_name.choices}')
 
     # Build models
 
@@ -89,15 +119,16 @@ def main():
             recall = ranker_em_recall(top_docs, true_answers)
             logger.info(f"Ranker em_recall {recall:.3f}")
 
-            chunks = chunker(top_docs)
-            mult_questions = str_multiplier(questions, chunks)
-            pred_answers, pred_scores = logit_ranker(chunks, mult_questions)
-
             # Counting ODQA metrics
 
-            format_true_answers = [[a] for a in true_answers]
-            f1 = squad_v1_f1(format_true_answers, pred_answers)
-            em = squad_v1_exact_match(format_true_answers, pred_answers)
+            chunks = chunker(top_docs)
+            mult_questions = str_multiplier(questions, chunks)
+            if dataset_name == 'ru_squad':
+                logit_ranker.sort_noans = True
+            pred_answers, pred_scores = logit_ranker(chunks, mult_questions)
+
+            f1 = squad_v1_f1(true_answers, pred_answers)
+            em = squad_v1_exact_match(true_answers, pred_answers)
             logger.info(f"ODQA f1 v1 {f1:.3f}")
             logger.info(f"ODQA em v1 {em:.3f}")
 
