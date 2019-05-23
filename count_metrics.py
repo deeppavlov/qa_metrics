@@ -2,6 +2,7 @@ import argparse
 import time
 import unicodedata
 import logging
+import csv
 
 import pandas as pd
 
@@ -72,7 +73,7 @@ def parse_ru_squad(dataset_path):
     if isinstance(true_answers[0], str):
         true_answers = [[a] for a in true_answers]
 
-    return questions, true_answers
+    return questions[:10], true_answers[:10]
 
 
 def main():
@@ -131,6 +132,13 @@ def main():
             em = squad_v1_exact_match(true_answers, pred_answers)
             logger.info(f"ODQA f1 v1 {f1:.3f}")
             logger.info(f"ODQA em v1 {em:.3f}")
+
+            # Write model answers to a file
+
+            with open(f'answers_top_{n}.csv', mode='w') as csv_file:
+                writer = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                for pr_a, pr_s in zip(pred_answers, pred_scores):
+                    writer.writerow([pr_a, round(pr_s, 3)])
 
         t = time.time() - start_time
         logger.info(f"Completed successfully in {t:.3f} seconds.")
