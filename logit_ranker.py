@@ -1,12 +1,9 @@
 import warnings
-from logging import getLogger
 from operator import itemgetter
 from typing import List, Union, Tuple
 
 from deeppavlov.core.common.chainer import Chainer
 from deeppavlov.core.models.estimator import Component
-
-logger = getLogger(__name__)
 
 
 class LogitRanker(Component):
@@ -43,11 +40,6 @@ class LogitRanker(Component):
             a batch of best answers and their scores
 
         """
-        # TODO output result for top_n
-        warnings.warn(f'{self.__class__.__name__}.__call__() API will be changed in the future release.'
-                      ' Instead of returning Tuple(List[str], List[float] will return'
-                      ' Tuple(List[List[str]], List[List[float]]).', FutureWarning)
-
         batch_best_answers = []
         batch_best_answers_scores = []
         for contexts, questions in zip(contexts_batch, questions_batch):
@@ -65,7 +57,6 @@ class LogitRanker(Component):
                 batch_best_answers.append(results[0][0])
                 batch_best_answers_scores.append(results[0][2])
             except IndexError:
-                logger.info(f'IndexError was raised on the following squad answers: {results}')
                 batch_best_answers.append('')
                 batch_best_answers_scores.append(-1)
         return batch_best_answers, batch_best_answers_scores
