@@ -3,6 +3,10 @@ import time
 import unicodedata
 import logging
 import csv
+from typing import List
+import sys
+import string
+import re
 
 import pandas as pd
 
@@ -30,8 +34,19 @@ parser.add_argument("-n", "--top-n", nargs='+', help="top n range contexts to re
 parser.add_argument("-ak", "--answer-key", help="a key to answers", type=str, default="Answer Dima")
 
 
-def encode_utf8(s: str):
-    return unicodedata.normalize('NFD', s).encode('utf-8')
+def normalize_strings(strings: List[str]):
+    combining_characters = dict.fromkeys([c for c in range(sys.maxunicode)
+                                          if unicodedata.combining(chr(c))])
+    regex = re.compile('[%s]' % re.escape(string.punctuation))
+    normalized = []
+    for ss in strings:
+        res = []
+        for s in ss:
+            s = unicodedata.normalize('NFD', s).translate(combining_characters)
+            s = regex.sub(' ', s)
+            res.append(s.lower())
+        normalized.append(res)
+    return normalized
 
 
 def ranker_em_recall(docs, answers):
@@ -89,6 +104,8 @@ def main():
     else:
         raise RuntimeError(f'Unknown dataset type! Select from {args.dataset_name.choices}')
 
+    formatted_true_answers = normalize_strings(true_answers)
+
     # Build models
 
     ranker = build_model(configs.doc_retrieval.ru_ranker_tfidf_wiki, download=True)
@@ -107,6 +124,9 @@ def main():
         ranker.pipe[0][2].top_n = args.top_n[1]
         doc_indices = ranker(questions)
         docs = [vocab([indices]) for indices in doc_indices]
+        formatted_docs = []
+        for dd in docs:
+            formatted_docs.append(normalize_strings(dd))
         del ranker
         del vocab
 
@@ -116,9 +136,12 @@ def main():
 
             logger.info(f"Counting metrics for top {n} retrieved docs.")
             top_docs = [i[:n] for d in docs for i in d]
+            formatted_top_docs = [i[:n] for d in formatted_docs for i in d]
 
             recall = ranker_em_recall(top_docs, true_answers)
             logger.info(f"Ranker em_recall {recall:.3f}")
+            soft_recall = ranker_em_recall(formatted_top_docs, formatted_true_answers)
+            logger.info(f"Ranker soft_recall {soft_recall:.3f}")
 
             # Counting ODQA metrics
 
